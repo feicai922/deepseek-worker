@@ -1,0 +1,9 @@
+[project]
+name = "deepseek-worker-mcp"
+version = "0.1.0"
+description = "MCP server for delegating grunt work to DeepSeek / OpenAI-compatible APIs"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.0.0",
+    "openai>=1.50.0",
+]

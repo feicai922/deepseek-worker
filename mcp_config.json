@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "deepseek-worker": {
+      "command": "uv",
+      "type": "stdio",
+      "args": [
+        "--directory",
+        "${PLUGIN_ROOT}",
+        "run",
+        "server.py"
+      ]
+    }
+  }
+}

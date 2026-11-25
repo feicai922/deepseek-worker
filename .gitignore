@@ -1,0 +1,12 @@
+# Secrets and local user configuration
+worker_config.json
+.env
+*.local.json
+
+# Python virtual environment & caches
+.venv/
+__pycache__/
+*.py[cod]
+
+# Node dependencies (ui/dist/app.html is committed so end-users don't need Node)
+ui/node_modules/

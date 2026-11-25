@@ -1,0 +1,13 @@
+{
+  "name": "deepseek-worker",
+  "displayName": "DeepSeek Worker",
+  "version": "0.1.0",
+  "description": "Let Gemini delegate grunt work, large file summarization, boilerplate drafting, and batch file tasks to DeepSeek or any OpenAI-compatible API via MCP.",
+  "author": "feicai922",
+  "repository": "https://github.com/feicai922/deepseek-worker",
+  "suggestedPrompts": [
+    "Open DeepSeek Worker settings",
+    "Ask DeepSeek to summarize the large log or source files in this project",
+    "Have DeepSeek draft unit tests or docstrings for a file and save the result"
+  ]
+}

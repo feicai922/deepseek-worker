@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DeepSeek Worker Settings</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --dw-bg: var(--color-background-primary, #ffffff);
+        --dw-surface: var(--color-background-secondary, #f6f7f9);
+        --dw-fg: var(--color-text-primary, #1f2328);
+        --dw-muted: var(--color-text-secondary, #636c76);
+        --dw-border: var(--color-border-primary, rgba(127, 127, 127, 0.28));
+        --dw-border-subtle: var(--color-border-secondary, rgba(127, 127, 127, 0.18));
+        --dw-hover: color-mix(in srgb, var(--dw-fg) 8%, var(--dw-bg));
+        --dw-accent: #2f5d8a;
+        --dw-accent-hover: #274e74;
+        --dw-accent-fg: #ffffff;
+      }
+      :root[data-theme="dark"] {
+        --dw-bg: var(--color-background-primary, #181a1f);
+        --dw-surface: var(--color-background-secondary, #20232a);
+        --dw-fg: var(--color-text-primary, #e6edf3);
+        --dw-muted: var(--color-text-secondary, #9da7b3);
+        --dw-border: var(--color-border-primary, rgba(255, 255, 255, 0.16));
+        --dw-border-subtle: var(--color-border-secondary, rgba(255, 255, 255, 0.1));
+        --dw-hover: color-mix(in srgb, var(--dw-fg) 10%, var(--dw-bg));
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: var(--dw-bg);
+        color: var(--dw-fg);
+        font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .card {
+        max-width: 620px;
+        margin: 0 auto;
+        background: var(--dw-surface);
+        border: 1px solid var(--dw-border);
+        border-radius: 8px;
+        padding: 16px;
+      }
+      .header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--dw-border-subtle);
+      }
+      .title-wrap h1 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .title-wrap p {
+        margin: 3px 0 0;
+        font-size: 12px;
+        color: var(--dw-muted);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 500;
+        white-space: nowrap;
+        border: 1px solid var(--dw-border);
+        background: var(--dw-bg);
+        color: var(--dw-muted);
+      }
+      .badge.ok {
+        background: var(--color-background-success, rgba(46, 160, 67, 0.14));
+        color: var(--color-text-success, #2ea043);
+        border-color: var(--color-border-success, rgba(46, 160, 67, 0.35));
+      }
+      .badge.warn {
+        background: var(--color-background-warning, rgba(210, 153, 34, 0.14));
+        color: var(--color-text-warning, #b07800);
+        border-color: var(--color-border-warning, rgba(210, 153, 34, 0.35));
+      }
+      .badge.err {
+        background: var(--color-background-danger, rgba(248, 81, 73, 0.14));
+        color: var(--color-text-danger, #d93f38);
+        border-color: var(--color-border-danger, rgba(248, 81, 73, 0.35));
+      }
+      .field {
+        margin-bottom: 12px;
+      }
+      .field label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-weight: 600;
+        margin-bottom: 5px;
+        font-size: 12px;
+      }
+      .hint {
+        font-weight: 400;
+        color: var(--dw-muted);
+        font-size: 11px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      input[type="text"],
+      input[type="password"],
+      input[type="number"],
+      select {
+        width: 100%;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--dw-border);
+        background: var(--dw-bg);
+        color: var(--dw-fg);
+        font-family: inherit;
+        font-size: 13px;
+        outline: none;
+        transition: border-color 120ms ease;
+      }
+      input:focus,
+      select:focus {
+        border-color: var(--dw-accent);
+      }
+      .presets {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .chip {
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--dw-border);
+        background: var(--dw-bg);
+        color: var(--dw-muted);
+        font-size: 11px;
+        cursor: pointer;
+        transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+      }
+      .chip:hover {
+        background: var(--dw-hover);
+        border-color: color-mix(in srgb, var(--dw-fg) 30%, transparent);
+        color: var(--dw-fg);
+      }
+      button {
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--dw-border);
+        background: var(--dw-bg);
+        color: var(--dw-fg);
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background-color 120ms ease, border-color 120ms ease;
+      }
+      button:hover:not(:disabled) {
+        background: var(--dw-hover);
+        border-color: color-mix(in srgb, var(--dw-fg) 32%, transparent);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      button.primary {
+        background: var(--dw-accent);
+        border-color: var(--dw-accent);
+        color: var(--dw-accent-fg);
+      }
+      button.primary:hover:not(:disabled) {
+        background: var(--dw-accent-hover);
+        border-color: var(--dw-accent-hover);
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .models-box {
+        margin-top: 8px;
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid var(--dw-border);
+        background: var(--dw-bg);
+        display: none;
+      }
+      .models-box.visible {
+        display: block;
+      }
+      .models-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+        max-height: 120px;
+        overflow-y: auto;
+      }
+      .chip.active {
+        background: var(--dw-accent);
+        border-color: var(--dw-accent);
+        color: var(--dw-accent-fg);
+        font-weight: 500;
+      }
+      .chip.active:hover {
+        background: var(--dw-accent-hover);
+        border-color: var(--dw-accent-hover);
+        color: var(--dw-accent-fg);
+      }
+      .status-box {
+        margin-top: 12px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        border: 1px solid var(--dw-border);
+        background: var(--dw-bg);
+        white-space: pre-wrap;
+        word-break: break-word;
+        display: none;
+      }
+      .status-box.visible {
+        display: block;
+      }
+      .status-box.ok {
+        border-color: var(--color-border-success, rgba(46, 160, 67, 0.35));
+        background: var(--color-background-success, rgba(46, 160, 67, 0.1));
+        color: var(--color-text-success, #2ea043);
+      }
+      .status-box.err {
+        border-color: var(--color-border-danger, rgba(248, 81, 73, 0.35));
+        background: var(--color-background-danger, rgba(248, 81, 73, 0.1));
+        color: var(--color-text-danger, #d93f38);
+      }
+      details {
+        margin-top: 10px;
+      }
+      summary {
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--dw-muted);
+        user-select: none;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="header">
+        <div class="title-wrap">
+          <h1>DeepSeek Worker 设置 <span class="hint">v0.1.1</span></h1>
+          <p>配置供 Gemini 派活使用的外部模型接口（密钥仅存本地，不进入模型上下文）</p>
+        </div>
+        <span id="config-badge" class="badge warn">加载中...</span>
+      </div>
+
+      <div class="field">
+        <label for="base-url">
+          <span>Base URL</span>
+          <span class="hint">OpenAI 兼容接口地址</span>
+        </label>
+        <input id="base-url" type="text" placeholder="https://api.deepseek.com" />
+        <div class="presets">
+          <button type="button" class="chip" data-url="https://api.deepseek.com" data-model="deepseek-chat">DeepSeek 官方</button>
+          <button type="button" class="chip" data-url="https://api.openai.com/v1" data-model="gpt-4o-mini">OpenAI /v1</button>
+          <button type="button" class="chip" data-url="http://localhost:11434/v1" data-model="qwen2.5-coder">Ollama 本地</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="api-key">
+          <span>API Key</span>
+          <span id="key-status" class="hint">未设置</span>
+        </label>
+        <div class="row">
+          <input id="api-key" type="password" autocomplete="off" placeholder="sk-..." />
+          <button type="button" id="toggle-key">显示</button>
+          <button type="button" id="clear-key" title="清除已保存的 API Key">清除</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="model">
+          <span>默认 Model</span>
+          <span class="hint">可手动输入或点击右侧拉取</span>
+        </label>
+        <div class="row">
+          <input id="model" type="text" placeholder="deepseek-chat" />
+          <button type="button" id="fetch-models">获取可用模型</button>
+        </div>
+        <div id="models-box" class="models-box">
+          <div class="row" style="justify-content: space-between;">
+            <span id="models-count" class="hint">可用模型列表</span>
+            <select id="models-select" style="max-width: 260px;"></select>
+          </div>
+          <div id="models-chips" class="models-chips"></div>
+        </div>
+      </div>
+
+      <details>
+        <summary>高级参数（超时时间 / 单文件读取上限）</summary>
+        <div class="grid2">
+          <div class="field" style="margin-bottom: 0;">
+            <label for="timeout-seconds"><span>超时 (秒)</span></label>
+            <input id="timeout-seconds" type="number" min="5" max="600" value="120" />
+          </div>
+          <div class="field" style="margin-bottom: 0;">
+            <label for="max-file-bytes"><span>单文件字节上限</span></label>
+            <input id="max-file-bytes" type="number" min="1000" max="2000000" step="10000" value="200000" />
+          </div>
+        </div>
+      </details>
+
+      <div class="actions">
+        <button type="button" id="save-btn" class="primary">保存配置</button>
+        <button type="button" id="test-btn">测试连通性</button>
+        <button type="button" id="refresh-btn">重新加载</button>
+      </div>
+
+      <div id="status-box" class="status-box"></div>
+    </div>
+
+    <script type="module" src="./dist/bundle.js"></script>
+  </body>
+</html>
