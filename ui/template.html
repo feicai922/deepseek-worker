@@ -8,24 +8,38 @@
       :root {
         color-scheme: light dark;
         --dw-bg: var(--color-background-primary, #ffffff);
-        --dw-surface: var(--color-background-secondary, #f6f7f9);
         --dw-fg: var(--color-text-primary, #1f2328);
         --dw-muted: var(--color-text-secondary, #636c76);
-        --dw-border: var(--color-border-primary, rgba(127, 127, 127, 0.28));
-        --dw-border-subtle: var(--color-border-secondary, rgba(127, 127, 127, 0.18));
-        --dw-hover: color-mix(in srgb, var(--dw-fg) 8%, var(--dw-bg));
+        --dw-surface: color-mix(in srgb, var(--dw-fg) 3.5%, var(--dw-bg));
+        --dw-border: color-mix(in srgb, var(--dw-fg) 20%, var(--dw-bg));
+        --dw-border-strong: color-mix(in srgb, var(--dw-fg) 30%, var(--dw-bg));
+        --dw-border-subtle: color-mix(in srgb, var(--dw-fg) 12%, var(--dw-bg));
+        --dw-hover: color-mix(in srgb, var(--dw-fg) 9%, var(--dw-bg));
         --dw-accent: #2f5d8a;
         --dw-accent-hover: #274e74;
         --dw-accent-fg: #ffffff;
       }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --dw-bg: var(--color-background-primary, #181a1f);
+          --dw-fg: var(--color-text-primary, #e6edf3);
+          --dw-muted: var(--color-text-secondary, #9da7b3);
+          --dw-surface: color-mix(in srgb, var(--dw-fg) 4.5%, var(--dw-bg));
+          --dw-border: color-mix(in srgb, var(--dw-fg) 22%, var(--dw-bg));
+          --dw-border-strong: color-mix(in srgb, var(--dw-fg) 34%, var(--dw-bg));
+          --dw-border-subtle: color-mix(in srgb, var(--dw-fg) 14%, var(--dw-bg));
+          --dw-hover: color-mix(in srgb, var(--dw-fg) 11%, var(--dw-bg));
+        }
+      }
       :root[data-theme="dark"] {
         --dw-bg: var(--color-background-primary, #181a1f);
-        --dw-surface: var(--color-background-secondary, #20232a);
         --dw-fg: var(--color-text-primary, #e6edf3);
         --dw-muted: var(--color-text-secondary, #9da7b3);
-        --dw-border: var(--color-border-primary, rgba(255, 255, 255, 0.16));
-        --dw-border-subtle: var(--color-border-secondary, rgba(255, 255, 255, 0.1));
-        --dw-hover: color-mix(in srgb, var(--dw-fg) 10%, var(--dw-bg));
+        --dw-surface: color-mix(in srgb, var(--dw-fg) 4.5%, var(--dw-bg));
+        --dw-border: color-mix(in srgb, var(--dw-fg) 22%, var(--dw-bg));
+        --dw-border-strong: color-mix(in srgb, var(--dw-fg) 34%, var(--dw-bg));
+        --dw-border-subtle: color-mix(in srgb, var(--dw-fg) 14%, var(--dw-bg));
+        --dw-hover: color-mix(in srgb, var(--dw-fg) 11%, var(--dw-bg));
       }
       * {
         box-sizing: border-box;
@@ -151,7 +165,7 @@
       }
       .chip:hover {
         background: var(--dw-hover);
-        border-color: color-mix(in srgb, var(--dw-fg) 30%, transparent);
+        border-color: var(--dw-border-strong);
         color: var(--dw-fg);
       }
       button {
@@ -169,7 +183,7 @@
       }
       button:hover:not(:disabled) {
         background: var(--dw-hover);
-        border-color: color-mix(in srgb, var(--dw-fg) 32%, transparent);
+        border-color: var(--dw-border-strong);
       }
       button:disabled {
         opacity: 0.5;
@@ -265,7 +279,7 @@
     <div class="card">
       <div class="header">
         <div class="title-wrap">
-          <h1>DeepSeek Worker 设置 <span class="hint">v0.1.1</span></h1>
+          <h1>DeepSeek Worker 设置 <span class="hint">v0.1.2</span></h1>
           <p>配置供 Gemini 派活使用的外部模型接口（密钥仅存本地，不进入模型上下文）</p>
         </div>
         <span id="config-badge" class="badge warn">加载中...</span>
