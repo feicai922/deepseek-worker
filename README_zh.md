@@ -16,6 +16,7 @@
   - **API Key 安全保存**（通过 `app`-only 工具写入本地 `worker_config.json`，**原始密钥不会进入 Gemini 对话上下文**）
   - **一键拉取可用模型**（请求 `/models` 接口并生成下拉框与快捷选择标签）
   - **连通性测试**（实测响应耗时、实际模型名称与返回内容）
+  - **Token 用量热力图**（本地记录每日与各模型输入/输出 Token 消耗，展示仿 GitHub 近半年/近一年贡献热力图）
 - **内置分流 Skill 与 Rule**：自带 `SKILL.md` 和 `AGENTS.md`，引导 Gemini 自动识别适合交给 DeepSeek 的任务并在完成后复核验证。
 
 ---
@@ -86,7 +87,8 @@
 | `deepseek_run_task` | 模型 | 派发单个子任务，支持直接读取 `file_paths` 和写入 `output_path`。 |
 | `deepseek_batch_files` | 模型 | 并发处理多个本地文件（`max_concurrency` 1–8）。 |
 | `deepseek_check_config` | 模型 | 检查脱敏后的配置状态并可选测试连通性。 |
-| `app_get_config` / `app_save_config` / `app_fetch_models` / `app_test_connection` | 仅前端 UI | 仅供面板调用的内部工具，不向模型暴露密钥。 |
+| `deepseek_usage_stats` | 模型 | 汇总已记录的 Token 用量（今日、近 7 天、近 30 天、累计及分模型统计）。 |
+| `app_get_config` / `app_save_config` / `app_fetch_models` / `app_test_connection` / `app_get_usage` / `app_reset_usage` | 仅前端 UI | 仅供面板调用的内部工具，不向模型暴露密钥。 |
 
 ---
 

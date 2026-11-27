@@ -16,6 +16,7 @@ An [Antigravity](https://antigravity.google) plugin that enables Gemini to deleg
   - **API Key** (stored locally in `worker_config.json` via `app`-only tools; never exposed to Gemini's model context)
   - **Live Model Discovery** (`/models` endpoint query with dropdown & quick-select chips)
   - **Connectivity Test** (measures latency and verifies model response)
+  - **Token Usage Heatmap** (tracks local daily/model token usage and renders a GitHub-style 6-month / 1-year contribution heatmap)
 - **Built-in Delegation Skill & Rule**: Bundles `skills/deepseek-delegation/SKILL.md` and `rules/AGENTS.md` so Gemini automatically recognizes when to offload grunt work.
 
 ---
@@ -86,7 +87,8 @@ Configuration is loaded dynamically on every tool call—changes take effect imm
 | `deepseek_run_task` | Model | Delegates a single task; supports `file_paths` and `output_path`. |
 | `deepseek_batch_files` | Model | Processes multiple local files in parallel (`max_concurrency` 1–8). |
 | `deepseek_check_config` | Model | Reports masked config status and optionally tests connectivity. |
-| `app_get_config` / `app_save_config` / `app_fetch_models` / `app_test_connection` | App-only | Internal UI callbacks hidden from the model to keep secrets out of context. |
+| `deepseek_usage_stats` | Model | Summarizes recorded token usage (today, 7d, 30d, all-time, per-model). |
+| `app_get_config` / `app_save_config` / `app_fetch_models` / `app_test_connection` / `app_get_usage` / `app_reset_usage` | App-only | Internal UI callbacks hidden from the model to keep secrets out of context. |
 
 ---
 

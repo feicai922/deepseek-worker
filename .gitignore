@@ -1,5 +1,6 @@
-# Secrets and local user configuration
+# Secrets, local config, and personal usage logs
 worker_config.json
+usage_stats.json
 .env
 *.local.json
 

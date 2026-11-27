@@ -25,6 +25,32 @@ interface TestPayload {
   message: string;
 }
 
+interface UsageBucket {
+  calls: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+interface ModelUsage extends UsageBucket {
+  model: string;
+}
+
+interface UsagePayload {
+  weeks: number;
+  grid_start: string;
+  today_date: string;
+  today: UsageBucket;
+  last_7d: UsageBucket;
+  last_30d: UsageBucket;
+  total: UsageBucket;
+  active_days: number;
+  streak_days: number;
+  daily: Record<string, UsageBucket>;
+  models: ModelUsage[];
+  updated_at: string;
+}
+
 const el = {
   badge: document.getElementById("config-badge") as HTMLSpanElement,
   baseUrl: document.getElementById("base-url") as HTMLInputElement,
@@ -44,10 +70,27 @@ const el = {
   testBtn: document.getElementById("test-btn") as HTMLButtonElement,
   refreshBtn: document.getElementById("refresh-btn") as HTMLButtonElement,
   statusBox: document.getElementById("status-box") as HTMLDivElement,
+  usageSubtitle: document.getElementById("usage-subtitle") as HTMLParagraphElement,
+  refreshUsageBtn: document.getElementById("refresh-usage-btn") as HTMLButtonElement,
+  resetUsageBtn: document.getElementById("reset-usage-btn") as HTMLButtonElement,
+  kpiToday: document.getElementById("kpi-today") as HTMLDivElement,
+  kpiTodayCalls: document.getElementById("kpi-today-calls") as HTMLDivElement,
+  kpi7d: document.getElementById("kpi-7d") as HTMLDivElement,
+  kpi7dCalls: document.getElementById("kpi-7d-calls") as HTMLDivElement,
+  kpi30d: document.getElementById("kpi-30d") as HTMLDivElement,
+  kpi30dCalls: document.getElementById("kpi-30d-calls") as HTMLDivElement,
+  kpiTotal: document.getElementById("kpi-total") as HTMLDivElement,
+  kpiStreak: document.getElementById("kpi-streak") as HTMLDivElement,
+  heatmapMonths: document.getElementById("heatmap-months") as HTMLDivElement,
+  heatmapGrid: document.getElementById("heatmap-grid") as HTMLDivElement,
+  heatmapDetail: document.getElementById("heatmap-detail") as HTMLSpanElement,
+  modelPills: document.getElementById("model-pills") as HTMLDivElement,
 };
 
 let clearApiKeyFlag = false;
 let currentHasKey = false;
+let currentWeeks = 26;
+let resetConfirmTimer: number | null = null;
 
 function showStatus(kind: "ok" | "err" | "info", msg: string) {
   el.statusBox.className = "status-box visible" + (kind === "info" ? "" : ` ${kind}`);
@@ -241,6 +284,7 @@ async function testConnection() {
       el.badge.className = "badge ok";
       el.badge.textContent = "测试通过";
       showStatus("ok", data.message);
+      void loadUsageStats(currentWeeks);
     } else {
       el.badge.className = "badge err";
       el.badge.textContent = "连接失败";
@@ -287,6 +331,188 @@ el.model.addEventListener("input", () => {
   highlightSelectedModel(el.model.value.trim());
 });
 
+function formatCompactTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}k`;
+  return n.toLocaleString("en-US");
+}
+
+function parseIsoDateUtc(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+function toIsoDateUtc(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function computeHeatLevel(tokens: number, scaleMax: number): number {
+  if (tokens <= 0) return 0;
+  const ratio = tokens / scaleMax;
+  if (ratio <= 0.25) return 1;
+  if (ratio <= 0.5) return 2;
+  if (ratio <= 0.75) return 3;
+  return 4;
+}
+
+function formatDayDetail(dateStr: string, stats?: UsageBucket): string {
+  if (!stats || stats.calls === 0) {
+    return `${dateStr}：0 tokens（无调用）`;
+  }
+  return `${dateStr}：${stats.total_tokens.toLocaleString("en-US")} tokens（输入 ${stats.prompt_tokens.toLocaleString("en-US")} / 输出 ${stats.completion_tokens.toLocaleString("en-US")} · ${stats.calls} 次调用）`;
+}
+
+function renderUsage(u: UsagePayload) {
+  el.kpiToday.textContent = formatCompactTokens(u.today.total_tokens);
+  el.kpiToday.title = `${u.today.total_tokens.toLocaleString("en-US")} tokens`;
+  el.kpiTodayCalls.textContent = `${u.today.calls} 次调用`;
+
+  el.kpi7d.textContent = formatCompactTokens(u.last_7d.total_tokens);
+  el.kpi7d.title = `${u.last_7d.total_tokens.toLocaleString("en-US")} tokens`;
+  el.kpi7dCalls.textContent = `${u.last_7d.calls} 次调用`;
+
+  el.kpi30d.textContent = formatCompactTokens(u.last_30d.total_tokens);
+  el.kpi30d.title = `${u.last_30d.total_tokens.toLocaleString("en-US")} tokens`;
+  el.kpi30dCalls.textContent = `${u.last_30d.calls} 次调用`;
+
+  el.kpiTotal.textContent = formatCompactTokens(u.total.total_tokens);
+  el.kpiTotal.title = `${u.total.total_tokens.toLocaleString("en-US")} tokens`;
+  el.kpiStreak.textContent = `连续 ${u.streak_days} 天 · 活跃 ${u.active_days} 天`;
+
+  if (u.updated_at) {
+    el.usageSubtitle.textContent = `最近更新: ${u.updated_at.replace("T", " ")}`;
+  } else {
+    el.usageSubtitle.textContent = "按本地实际调用统计输入与输出 Token";
+  }
+
+  let maxDailyTokens = 0;
+  for (const s of Object.values(u.daily)) {
+    if (s.total_tokens > maxDailyTokens) maxDailyTokens = s.total_tokens;
+  }
+  const scaleMax = Math.max(maxDailyTokens, 4000);
+
+  const startDate = parseIsoDateUtc(u.grid_start);
+  const todayDate = parseIsoDateUtc(u.today_date);
+
+  el.heatmapGrid.innerHTML = "";
+  el.heatmapMonths.innerHTML = "";
+  el.heatmapMonths.style.gridTemplateColumns = `repeat(${u.weeks}, 11px)`;
+
+  let prevMonth = -1;
+  for (let w = 0; w < u.weeks; w++) {
+    const colStart = new Date(startDate.getTime() + w * 7 * 86_400_000);
+    const monthCell = document.createElement("span");
+    monthCell.className = "heatmap-month-label";
+    const m = colStart.getUTCMonth() + 1;
+    if (w === 0 || m !== prevMonth) {
+      monthCell.textContent = `${m}月`;
+      prevMonth = m;
+    }
+    el.heatmapMonths.appendChild(monthCell);
+
+    for (let dow = 0; dow < 7; dow++) {
+      const cellDate = new Date(colStart.getTime() + dow * 86_400_000);
+      const cell = document.createElement("button");
+      cell.type = "button";
+      if (cellDate.getTime() > todayDate.getTime()) {
+        cell.className = "heat-cell future";
+        cell.tabIndex = -1;
+      } else {
+        const iso = toIsoDateUtc(cellDate);
+        const stats = u.daily[iso];
+        const tokens = stats?.total_tokens ?? 0;
+        const level = computeHeatLevel(tokens, scaleMax);
+        const detail = formatDayDetail(iso, stats);
+        cell.className = "heat-cell";
+        cell.dataset.level = String(level);
+        cell.title = detail;
+        cell.setAttribute("aria-label", detail);
+        cell.addEventListener("mouseenter", () => {
+          el.heatmapDetail.textContent = detail;
+        });
+        cell.addEventListener("focus", () => {
+          el.heatmapDetail.textContent = detail;
+        });
+        cell.addEventListener("click", () => {
+          el.heatmapDetail.textContent = detail;
+        });
+      }
+      el.heatmapGrid.appendChild(cell);
+    }
+  }
+
+  el.heatmapDetail.textContent = formatDayDetail(u.today_date, u.daily[u.today_date]);
+
+  el.modelPills.innerHTML = "";
+  for (const m of u.models) {
+    const pill = document.createElement("span");
+    pill.className = "model-pill";
+    const strong = document.createElement("strong");
+    strong.textContent = m.model;
+    pill.appendChild(strong);
+    pill.appendChild(
+      document.createTextNode(` · ${formatCompactTokens(m.total_tokens)} (${m.calls}次)`),
+    );
+    el.modelPills.appendChild(pill);
+  }
+}
+
+async function loadUsageStats(weeks: number = currentWeeks) {
+  currentWeeks = weeks;
+  for (const btn of Array.from(document.querySelectorAll<HTMLButtonElement>("[data-weeks]"))) {
+    btn.classList.toggle("active", Number(btn.dataset.weeks) === weeks);
+  }
+  try {
+    const res = await app.callServerTool({
+      name: "app_get_usage",
+      arguments: { weeks },
+    });
+    const data = extractStructured<UsagePayload>(res as never);
+    if (data && typeof data.grid_start === "string") {
+      renderUsage(data);
+    }
+  } catch (err) {
+    el.heatmapDetail.textContent = `加载用量统计失败: ${String(err)}`;
+  }
+}
+
+async function handleResetUsage() {
+  if (el.resetUsageBtn.dataset.confirm !== "1") {
+    el.resetUsageBtn.dataset.confirm = "1";
+    el.resetUsageBtn.textContent = "确认清空?";
+    if (resetConfirmTimer !== null) window.clearTimeout(resetConfirmTimer);
+    resetConfirmTimer = window.setTimeout(() => {
+      delete el.resetUsageBtn.dataset.confirm;
+      el.resetUsageBtn.textContent = "清空";
+      resetConfirmTimer = null;
+    }, 3000);
+    return;
+  }
+  if (resetConfirmTimer !== null) {
+    window.clearTimeout(resetConfirmTimer);
+    resetConfirmTimer = null;
+  }
+  delete el.resetUsageBtn.dataset.confirm;
+  el.resetUsageBtn.textContent = "清空";
+  try {
+    const res = await app.callServerTool({ name: "app_reset_usage", arguments: {} });
+    const data = extractStructured<UsagePayload>(res as never);
+    if (data) renderUsage(data);
+  } catch (err) {
+    el.heatmapDetail.textContent = `清空失败: ${String(err)}`;
+  }
+}
+
+for (const btn of Array.from(document.querySelectorAll<HTMLButtonElement>("[data-weeks]"))) {
+  btn.addEventListener("click", () => {
+    const w = Number(btn.dataset.weeks) || 26;
+    void loadUsageStats(w);
+  });
+}
+
+el.refreshUsageBtn.addEventListener("click", () => void loadUsageStats(currentWeeks));
+el.resetUsageBtn.addEventListener("click", () => void handleResetUsage());
+
 el.saveBtn.addEventListener("click", () => void saveConfig());
 el.testBtn.addEventListener("click", () => void testConnection());
 el.fetchModels.addEventListener("click", () => void fetchModels());
@@ -297,5 +523,5 @@ el.refreshBtn.addEventListener("click", () => void reloadFromServer());
   const ctx = app.getHostContext();
   if (ctx?.theme) applyDocumentTheme(ctx.theme);
   if (ctx?.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
-  await reloadFromServer();
+  await Promise.all([reloadFromServer(), loadUsageStats(currentWeeks)]);
 })();

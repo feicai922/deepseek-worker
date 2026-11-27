@@ -7,6 +7,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -16,8 +17,10 @@ from openai import AsyncOpenAI
 
 PLUGIN_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = PLUGIN_DIR / "worker_config.json"
+USAGE_PATH = PLUGIN_DIR / "usage_stats.json"
 APP_HTML_PATH = PLUGIN_DIR / "ui" / "dist" / "app.html"
 APP_URI = "ui://deepseek-worker/settings.html"
+_USAGE_LOCK = asyncio.Lock()
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are a fast, precise engineering worker delegated a subtask by a lead agent. "
@@ -190,16 +193,170 @@ async def call_llm(
             content = str(reasoning).strip()
 
     usage = resp.usage
+    used_model = resp.model or target_model
     if usage:
+        prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+        total_tokens = int(getattr(usage, "total_tokens", 0) or (prompt_tokens + completion_tokens))
         usage_summary = (
-            f"model={resp.model or target_model}, "
-            f"prompt_tokens={usage.prompt_tokens}, "
-            f"completion_tokens={usage.completion_tokens}"
+            f"model={used_model}, "
+            f"prompt_tokens={prompt_tokens}, "
+            f"completion_tokens={completion_tokens}"
         )
     else:
-        usage_summary = f"model={resp.model or target_model}"
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+        usage_summary = f"model={used_model}"
 
+    await record_usage(used_model, prompt_tokens, completion_tokens, total_tokens)
     return content, usage_summary
+
+
+def _empty_usage_store() -> dict[str, Any]:
+    return {"daily": {}, "models": {}, "updated_at": ""}
+
+
+def _read_usage_store_sync() -> dict[str, Any]:
+    if not USAGE_PATH.exists():
+        return _empty_usage_store()
+    try:
+        raw = json.loads(USAGE_PATH.read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            return {
+                "daily": raw.get("daily") if isinstance(raw.get("daily"), dict) else {},
+                "models": raw.get("models") if isinstance(raw.get("models"), dict) else {},
+                "updated_at": str(raw.get("updated_at") or ""),
+            }
+    except Exception:
+        pass
+    return _empty_usage_store()
+
+
+def _accumulate_bucket(
+    bucket_map: dict[str, Any],
+    key: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    total_tokens: int,
+) -> None:
+    cur = bucket_map.get(key)
+    if not isinstance(cur, dict):
+        cur = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    cur["calls"] = int(cur.get("calls", 0)) + 1
+    cur["prompt_tokens"] = int(cur.get("prompt_tokens", 0)) + prompt_tokens
+    cur["completion_tokens"] = int(cur.get("completion_tokens", 0)) + completion_tokens
+    cur["total_tokens"] = int(cur.get("total_tokens", 0)) + total_tokens
+    bucket_map[key] = cur
+
+
+async def record_usage(
+    model_name: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    total_tokens: int,
+) -> None:
+    """Persist per-day and per-model token usage safely under an async lock."""
+    today_key = date.today().isoformat()
+    async with _USAGE_LOCK:
+        store = _read_usage_store_sync()
+        _accumulate_bucket(store["daily"], today_key, prompt_tokens, completion_tokens, total_tokens)
+        _accumulate_bucket(
+            store["models"], model_name or "unknown", prompt_tokens, completion_tokens, total_tokens
+        )
+        store["updated_at"] = datetime.now().isoformat(timespec="seconds")
+        USAGE_PATH.write_text(json.dumps(store, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _sum_range(daily: dict[str, Any], start_day: date | None, end_day: date) -> dict[str, int]:
+    totals = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    for day_str, stats in daily.items():
+        if not isinstance(stats, dict):
+            continue
+        try:
+            d = date.fromisoformat(day_str)
+        except ValueError:
+            continue
+        if d > end_day or (start_day is not None and d < start_day):
+            continue
+        totals["calls"] += int(stats.get("calls", 0))
+        totals["prompt_tokens"] += int(stats.get("prompt_tokens", 0))
+        totals["completion_tokens"] += int(stats.get("completion_tokens", 0))
+        totals["total_tokens"] += int(stats.get("total_tokens", 0))
+    return totals
+
+
+def _compute_streak(daily: dict[str, Any], today: date) -> int:
+    def is_active(d: date) -> bool:
+        entry = daily.get(d.isoformat())
+        return isinstance(entry, dict) and int(entry.get("calls", 0)) > 0
+
+    cursor = today if is_active(today) else today - timedelta(days=1)
+    streak = 0
+    while is_active(cursor):
+        streak += 1
+        cursor -= timedelta(days=1)
+    return streak
+
+
+def build_usage_payload(weeks: int = 26) -> dict[str, Any]:
+    """Build aggregated KPIs and daily map for the GitHub-style heatmap."""
+    weeks_clamped = max(4, min(int(weeks or 26), 53))
+    store = _read_usage_store_sync()
+    daily: dict[str, Any] = store["daily"]
+    today = date.today()
+
+    # Align window start to Sunday so columns line up cleanly (GitHub contribution grid).
+    days_since_sunday = (today.weekday() + 1) % 7
+    grid_start = today - timedelta(days=days_since_sunday + (weeks_clamped - 1) * 7)
+
+    grid_daily: dict[str, dict[str, int]] = {}
+    for day_str, stats in daily.items():
+        if not isinstance(stats, dict):
+            continue
+        try:
+            d = date.fromisoformat(day_str)
+        except ValueError:
+            continue
+        if grid_start <= d <= today:
+            grid_daily[day_str] = {
+                "calls": int(stats.get("calls", 0)),
+                "prompt_tokens": int(stats.get("prompt_tokens", 0)),
+                "completion_tokens": int(stats.get("completion_tokens", 0)),
+                "total_tokens": int(stats.get("total_tokens", 0)),
+            }
+
+    models_list = [
+        {
+            "model": name,
+            "calls": int(s.get("calls", 0)),
+            "prompt_tokens": int(s.get("prompt_tokens", 0)),
+            "completion_tokens": int(s.get("completion_tokens", 0)),
+            "total_tokens": int(s.get("total_tokens", 0)),
+        }
+        for name, s in store["models"].items()
+        if isinstance(s, dict)
+    ]
+    models_list.sort(key=lambda x: x["total_tokens"], reverse=True)
+
+    active_days = sum(
+        1 for s in daily.values() if isinstance(s, dict) and int(s.get("calls", 0)) > 0
+    )
+
+    return {
+        "weeks": weeks_clamped,
+        "grid_start": grid_start.isoformat(),
+        "today_date": today.isoformat(),
+        "today": _sum_range(daily, today, today),
+        "last_7d": _sum_range(daily, today - timedelta(days=6), today),
+        "last_30d": _sum_range(daily, today - timedelta(days=29), today),
+        "total": _sum_range(daily, None, today),
+        "active_days": active_days,
+        "streak_days": _compute_streak(daily, today),
+        "daily": grid_daily,
+        "models": models_list,
+        "updated_at": store.get("updated_at", ""),
+    }
 
 
 @mcp.resource(
@@ -331,6 +488,54 @@ async def app_test_connection(api_key: str = "", base_url: str = "", model: str 
         content=[TextContent(type="text", text=json.dumps(payload))],
         structuredContent=payload,
     )
+
+
+@mcp.tool(meta=APP_ONLY_META)
+async def app_get_usage(weeks: int = 26) -> CallToolResult:
+    """App-only: return aggregated token usage and daily heatmap data."""
+    payload = build_usage_payload(weeks=weeks)
+    return CallToolResult(
+        content=[TextContent(type="text", text=json.dumps(payload))],
+        structuredContent=payload,
+    )
+
+
+@mcp.tool(meta=APP_ONLY_META)
+async def app_reset_usage() -> CallToolResult:
+    """App-only: clear recorded token usage statistics."""
+    async with _USAGE_LOCK:
+        USAGE_PATH.write_text(
+            json.dumps(_empty_usage_store(), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    payload = build_usage_payload(weeks=26)
+    return CallToolResult(
+        content=[TextContent(type="text", text=json.dumps(payload))],
+        structuredContent=payload,
+    )
+
+
+@mcp.tool()
+async def deepseek_usage_stats() -> str:
+    """Summarize recorded DeepSeek Worker token usage (today, 7d, 30d, all-time, and per-model)."""
+    u = build_usage_payload(weeks=52)
+    lines = [
+        f"Today ({u['today_date']}): {u['today']['total_tokens']:,} tokens ({u['today']['calls']} calls)",
+        f"Last 7 days: {u['last_7d']['total_tokens']:,} tokens ({u['last_7d']['calls']} calls)",
+        f"Last 30 days: {u['last_30d']['total_tokens']:,} tokens ({u['last_30d']['calls']} calls)",
+        (
+            f"All-time: {u['total']['total_tokens']:,} tokens "
+            f"(prompt={u['total']['prompt_tokens']:,}, completion={u['total']['completion_tokens']:,}, "
+            f"calls={u['total']['calls']}, active_days={u['active_days']}, streak={u['streak_days']}d)"
+        ),
+    ]
+    if u["models"]:
+        lines.append("By model:")
+        for m in u["models"]:
+            lines.append(
+                f"- {m['model']}: {m['total_tokens']:,} tokens ({m['calls']} calls)"
+            )
+    return "\n".join(lines)
 
 
 @mcp.tool()

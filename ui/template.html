@@ -18,6 +18,12 @@
         --dw-accent: #2f5d8a;
         --dw-accent-hover: #274e74;
         --dw-accent-fg: #ffffff;
+        --dw-heat-0: color-mix(in srgb, var(--dw-fg) 6%, var(--dw-bg));
+        --dw-heat-1: #9be9a8;
+        --dw-heat-2: #40c463;
+        --dw-heat-3: #30a14e;
+        --dw-heat-4: #216e39;
+        --dw-heat-border: color-mix(in srgb, var(--dw-fg) 10%, transparent);
       }
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme="light"]) {
@@ -29,6 +35,12 @@
           --dw-border-strong: color-mix(in srgb, var(--dw-fg) 34%, var(--dw-bg));
           --dw-border-subtle: color-mix(in srgb, var(--dw-fg) 14%, var(--dw-bg));
           --dw-hover: color-mix(in srgb, var(--dw-fg) 11%, var(--dw-bg));
+          --dw-heat-0: color-mix(in srgb, var(--dw-fg) 7%, var(--dw-bg));
+          --dw-heat-1: #0e4429;
+          --dw-heat-2: #006d32;
+          --dw-heat-3: #26a641;
+          --dw-heat-4: #39d353;
+          --dw-heat-border: rgba(255, 255, 255, 0.08);
         }
       }
       :root[data-theme="dark"] {
@@ -40,6 +52,12 @@
         --dw-border-strong: color-mix(in srgb, var(--dw-fg) 34%, var(--dw-bg));
         --dw-border-subtle: color-mix(in srgb, var(--dw-fg) 14%, var(--dw-bg));
         --dw-hover: color-mix(in srgb, var(--dw-fg) 11%, var(--dw-bg));
+        --dw-heat-0: color-mix(in srgb, var(--dw-fg) 7%, var(--dw-bg));
+        --dw-heat-1: #0e4429;
+        --dw-heat-2: #006d32;
+        --dw-heat-3: #26a641;
+        --dw-heat-4: #39d353;
+        --dw-heat-border: rgba(255, 255, 255, 0.08);
       }
       * {
         box-sizing: border-box;
@@ -273,13 +291,176 @@
         gap: 10px;
         margin-top: 8px;
       }
+      .card + .card {
+        margin-top: 12px;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      @media (max-width: 500px) {
+        .kpi-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      .kpi {
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--dw-border);
+        background: var(--dw-bg);
+      }
+      .kpi-label {
+        font-size: 11px;
+        color: var(--dw-muted);
+      }
+      .kpi-value {
+        margin-top: 2px;
+        font-size: 15px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      .kpi-sub {
+        margin-top: 1px;
+        font-size: 11px;
+        color: var(--dw-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .heatmap-panel {
+        padding: 10px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--dw-border);
+        background: var(--dw-bg);
+      }
+      .heatmap-scroll {
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .heatmap-wrap {
+        display: inline-flex;
+        flex-direction: column;
+        min-width: max-content;
+      }
+      .heatmap-months {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 11px;
+        gap: 3px;
+        margin-left: 24px;
+        margin-bottom: 4px;
+        height: 14px;
+        font-size: 10px;
+        color: var(--dw-muted);
+      }
+      .heatmap-month-label {
+        white-space: nowrap;
+        overflow: visible;
+        line-height: 14px;
+      }
+      .heatmap-body {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+      }
+      .heatmap-weekdays {
+        display: grid;
+        grid-template-rows: repeat(7, 11px);
+        gap: 3px;
+        width: 18px;
+        font-size: 10px;
+        line-height: 11px;
+        color: var(--dw-muted);
+        text-align: right;
+      }
+      .heatmap-grid {
+        display: grid;
+        grid-template-rows: repeat(7, 11px);
+        grid-auto-flow: column;
+        grid-auto-columns: 11px;
+        gap: 3px;
+      }
+      .heat-cell {
+        width: 11px;
+        height: 11px;
+        border-radius: 2px;
+        background: var(--dw-heat-0);
+        border: 1px solid var(--dw-heat-border);
+        cursor: pointer;
+        padding: 0;
+      }
+      .heat-cell.future {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .heat-cell[data-level="1"] {
+        background: var(--dw-heat-1);
+      }
+      .heat-cell[data-level="2"] {
+        background: var(--dw-heat-2);
+      }
+      .heat-cell[data-level="3"] {
+        background: var(--dw-heat-3);
+      }
+      .heat-cell[data-level="4"] {
+        background: var(--dw-heat-4);
+      }
+      .heat-cell:hover {
+        outline: 1.5px solid var(--dw-fg);
+        outline-offset: 0px;
+      }
+      .heatmap-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+      }
+      .heatmap-detail {
+        font-size: 11px;
+        color: var(--dw-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .legend {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 11px;
+        color: var(--dw-muted);
+      }
+      .legend .heat-cell {
+        cursor: default;
+      }
+      .legend .heat-cell:hover {
+        outline: none;
+      }
+      .model-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .model-pill {
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: 1px solid var(--dw-border);
+        background: var(--dw-bg);
+        font-size: 11px;
+        color: var(--dw-muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .model-pill strong {
+        color: var(--dw-fg);
+        font-weight: 500;
+      }
     </style>
   </head>
   <body>
     <div class="card">
       <div class="header">
         <div class="title-wrap">
-          <h1>DeepSeek Worker 设置 <span class="hint">v0.1.2</span></h1>
+          <h1>DeepSeek Worker 设置 <span class="hint">v0.2.0</span></h1>
           <p>配置供 Gemini 派活使用的外部模型接口（密钥仅存本地，不进入模型上下文）</p>
         </div>
         <span id="config-badge" class="badge warn">加载中...</span>
@@ -349,6 +530,78 @@
       </div>
 
       <div id="status-box" class="status-box"></div>
+    </div>
+
+    <div class="card">
+      <div class="header">
+        <div class="title-wrap">
+          <h1>Token 用量统计</h1>
+          <p id="usage-subtitle">按本地实际调用统计输入与输出 Token</p>
+        </div>
+        <div class="row" style="gap: 6px;">
+          <button type="button" class="chip active" data-weeks="26">近半年</button>
+          <button type="button" class="chip" data-weeks="52">近一年</button>
+          <button type="button" id="refresh-usage-btn" class="chip">刷新</button>
+          <button type="button" id="reset-usage-btn" class="chip">清空</button>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">今日用量</div>
+          <div class="kpi-value" id="kpi-today">0</div>
+          <div class="kpi-sub" id="kpi-today-calls">0 次调用</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">近 7 天</div>
+          <div class="kpi-value" id="kpi-7d">0</div>
+          <div class="kpi-sub" id="kpi-7d-calls">0 次调用</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">近 30 天</div>
+          <div class="kpi-value" id="kpi-30d">0</div>
+          <div class="kpi-sub" id="kpi-30d-calls">0 次调用</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">累计总计</div>
+          <div class="kpi-value" id="kpi-total">0</div>
+          <div class="kpi-sub" id="kpi-streak">连续 0 天</div>
+        </div>
+      </div>
+
+      <div class="heatmap-panel">
+        <div class="heatmap-scroll">
+          <div class="heatmap-wrap">
+            <div id="heatmap-months" class="heatmap-months"></div>
+            <div class="heatmap-body">
+              <div class="heatmap-weekdays">
+                <span></span>
+                <span>一</span>
+                <span></span>
+                <span>三</span>
+                <span></span>
+                <span>五</span>
+                <span></span>
+              </div>
+              <div id="heatmap-grid" class="heatmap-grid"></div>
+            </div>
+          </div>
+        </div>
+        <div class="heatmap-footer">
+          <span id="heatmap-detail" class="heatmap-detail">悬停或点击方格查看当日明细</span>
+          <span class="legend">
+            <span>少</span>
+            <span class="heat-cell" data-level="0"></span>
+            <span class="heat-cell" data-level="1"></span>
+            <span class="heat-cell" data-level="2"></span>
+            <span class="heat-cell" data-level="3"></span>
+            <span class="heat-cell" data-level="4"></span>
+            <span>多</span>
+          </span>
+        </div>
+      </div>
+
+      <div id="model-pills" class="model-pills"></div>
     </div>
 
     <script type="module" src="./dist/bundle.js"></script>
